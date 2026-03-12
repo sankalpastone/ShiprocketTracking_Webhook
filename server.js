@@ -4,99 +4,94 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-let token = "";
-
 /* ------------------------------
-   STEP 1: Generate Shiprocket Token
+   CONFIGURATION
 -------------------------------- */
 
-async function generateToken() {
-  try {
-
-    const response = await axios.post(
-      "https://apiv2.shiprocket.in/v1/external/auth/login",
-      {
-        email: "93shash@gmail.com",
-        password: "D%M4#%W0@PM7ybvHvA#kZFwEN4gefvL8"
-      }
-    );
-
-    token = response.data.token;
-
-    console.log("✅ Shiprocket Token Generated");
-    console.log("TOKEN:", token);
-
-  } catch (error) {
-
-    console.log("❌ Shiprocket Login Failed");
-    console.log(error.response?.data);
-
-  }
-}
+const SHIPROCKET_WEBHOOK_SECRET = "sankalpa_shiprocket_secret";
+const ZOLILO_WEBHOOK = "https://automation.zolilo.com/webhook/69b2685702e28c7ee4e9017f";
 
 /* ------------------------------
-   STEP 2: Webhook Endpoint
+   SHIPROCKET WEBHOOK ENDPOINT
 -------------------------------- */
 
 app.post("/shiprocket-webhook", async (req, res) => {
 
   try {
 
-    const { awb, phone, order_id, name } = req.body;
-
-    console.log("📦 Webhook received:", req.body);
-
     /* ------------------------------
-       STEP 3: Call Tracking API
+       1️⃣ Verify Shiprocket token
     -------------------------------- */
 
-    const tracking = await axios.get(
-      `https://apiv2.shiprocket.in/v1/external/courier/track/awb/${awb}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
+    const apiKey = req.headers["x-api-key"];
 
-    const shipment = tracking.data.tracking_data.shipment_track[0];
+    if (apiKey !== SHIPROCKET_WEBHOOK_SECRET) {
+      console.log("❌ Invalid webhook token");
+      return res.status(403).send("Unauthorized");
+    }
 
-    const status = shipment.current_status;
-    const courier = shipment.courier_name;
-    const trackingLink = shipment.tracking_url;
-
-    console.log("🚚 Shipment Status:", status);
+    console.log("📦 Webhook received:");
+    console.log(req.body);
 
     /* ------------------------------
-       STEP 4: Send to com.bot
+       2️⃣ Extract shipment details
     -------------------------------- */
 
-    await axios.post("https://automation.zolilo.com/webhook/69b2685702e28c7ee4e9017f", {
-      phone: phone,
-      name: name,
+    const {
+      awb,
+      shipment_status,
+      courier_name,
+      order_id
+    } = req.body;
+
+    const status = shipment_status;
+    const courier = courier_name;
+
+    const trackingLink = `https://shiprocket.co/tracking/${awb}`;
+
+    console.log("🚚 Status:", status);
+
+    /* ------------------------------
+       3️⃣ Send data to Zolilo
+    -------------------------------- */
+
+    await axios.post(ZOLILO_WEBHOOK, {
+
+      phone: "CUSTOMER_PHONE_NUMBER",
+      name: "Customer",
+
       order_id: order_id,
       awb: awb,
+
       status: status,
       courier: courier,
+
       tracking_link: trackingLink
+
     });
 
-    res.send("Tracking sent to WhatsApp");
+    console.log("✅ Sent to Zolilo");
+
+    res.send("Webhook processed");
 
   } catch (error) {
 
     console.log("❌ ERROR:");
-    console.log(error.response?.data);
 
-    res.status(500).send("Error");
+    if (error.response) {
+      console.log(error.response.data);
+    } else {
+      console.log(error.message);
+    }
+
+    res.status(500).send("Server error");
 
   }
 
 });
 
 /* ------------------------------
-   STEP 5: Health Check Route
+   HEALTH CHECK ROUTE
 -------------------------------- */
 
 app.get("/", (req, res) => {
@@ -104,13 +99,11 @@ app.get("/", (req, res) => {
 });
 
 /* ------------------------------
-   STEP 6: Start Server
+   START SERVER
 -------------------------------- */
 
-app.listen(3000, async () => {
+const PORT = process.env.PORT || 3000;
 
-  await generateToken();
-
-  console.log("🚀 Server running on port 3000");
-
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
