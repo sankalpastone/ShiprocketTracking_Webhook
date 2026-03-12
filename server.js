@@ -15,7 +15,7 @@ const ZOLILO_WEBHOOK = "https://automation.zolilo.com/webhook/69b2685702e28c7ee4
    SHIPROCKET WEBHOOK ENDPOINT
 -------------------------------- */
 
-app.post("/shiprocket-webhook", async (req, res) => {
+app.post("/sankalpa-webhook", async (req, res) => {
 
   try {
 
