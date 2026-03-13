@@ -4,79 +4,111 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-/* ------------------------------
-   CONFIGURATION
--------------------------------- */
+/* --------------------------
+CONFIG
+-------------------------- */
 
-const SHIPROCKET_WEBHOOK_SECRET = "sankalpa_shiprocket_secret";
-const ZOLILO_WEBHOOK = "https://automation.zolilo.com/webhook/69b2685702e28c7ee4e9017f";
+const WEBHOOK_SECRET = "sankalpa_shiprocket_secret";
 
-/* ------------------------------
-   SHIPROCKET WEBHOOK ENDPOINT
--------------------------------- */
+const ZOLILO_WEBHOOK =
+  "https://automation.zolilo.com/webhook/69b2685702e28c7ee4e9017f";
+
+/* --------------------------
+STATUS → MESSAGE MAPPING
+-------------------------- */
+
+function getStatusType(status) {
+  status = status.toLowerCase();
+
+  if (status.includes("picked")) return "picked";
+  if (status.includes("transit")) return "transit";
+  if (status.includes("out for delivery")) return "out_for_delivery";
+  if (status.includes("delivered")) return "delivered";
+
+  return "update";
+}
+
+/* --------------------------
+SHIPROCKET WEBHOOK
+-------------------------- */
 
 app.post("/sankalpa-webhook", async (req, res) => {
-
   try {
-
-    /* ------------------------------
-       1️⃣ Verify Shiprocket token
-    -------------------------------- */
-
     const apiKey = req.headers["x-api-key"];
 
-    if (apiKey !== SHIPROCKET_WEBHOOK_SECRET) {
+    if (apiKey !== WEBHOOK_SECRET) {
       console.log("❌ Invalid webhook token");
       return res.status(403).send("Unauthorized");
     }
 
+    const data = req.body;
+
     console.log("📦 Webhook received:");
-    console.log(req.body);
+    console.log(data);
 
-    /* ------------------------------
-       2️⃣ Extract shipment details
-    -------------------------------- */
+    const awb = data.awb;
+    const order_id = data.order_id;
+    const status = data.shipment_status;
+    const courier = data.courier_name;
 
-    const {
-      awb,
-      shipment_status,
-      courier_name,
-      order_id
-    } = req.body;
+    const phone = data.phone || "919508372431";
+    const name = data.name || "Customer";
 
-    const status = shipment_status;
-    const courier = courier_name;
+    const location =
+      data.scans && data.scans.length > 0
+        ? data.scans[0].location
+        : "In Transit";
 
-    const trackingLink = `https://shiprocket.co/tracking/${awb}`;
+    const tracking_link = `https://shiprocket.co/tracking/${awb}`;
 
-    console.log("🚚 Status:", status);
+    const statusType = getStatusType(status);
 
-    /* ------------------------------
-       3️⃣ Send data to Zolilo
-    -------------------------------- */
+    console.log("🚚 Status:", statusType);
+
+    /* --------------------------
+    SEND TO ZOLILO
+    -------------------------- */
 
     await axios.post(ZOLILO_WEBHOOK, {
-
-      phone: "919508372431",
-      name: "Customer",
-
-      order_id: order_id,
-      awb: awb,
-
-      status: status,
-      courier: courier,
-
-      tracking_link: trackingLink
-
+      phone,
+      name,
+      order_id,
+      awb,
+      courier,
+      status,
+      location,
+      tracking_link,
+      status_type: statusType,
     });
 
     console.log("✅ Sent to Zolilo");
 
+    /* --------------------------
+    REVIEW MESSAGE AFTER 3 DAYS
+    -------------------------- */
+
+    if (statusType === "delivered") {
+      setTimeout(async () => {
+        try {
+          await axios.post(ZOLILO_WEBHOOK, {
+            phone,
+            name,
+            order_id,
+            review: true,
+            review_link:
+              "https://sankalpastone.com/account/orders",
+          });
+
+          console.log("⭐ Review request sent");
+        } catch (err) {
+          console.log("❌ Review send failed");
+        }
+      }, 3 * 24 * 60 * 60 * 1000);
+    }
+
     res.send("Webhook processed");
-
   } catch (error) {
-
-    console.log("❌ ERROR:");
+    console.log("❌ ERROR");
 
     if (error.response) {
       console.log(error.response.data);
@@ -85,22 +117,20 @@ app.post("/sankalpa-webhook", async (req, res) => {
     }
 
     res.status(500).send("Server error");
-
   }
-
 });
 
-/* ------------------------------
-   HEALTH CHECK ROUTE
--------------------------------- */
+/* --------------------------
+HEALTH CHECK
+-------------------------- */
 
 app.get("/", (req, res) => {
   res.send("🚀 Shiprocket Tracking Server Running");
 });
 
-/* ------------------------------
-   START SERVER
--------------------------------- */
+/* --------------------------
+START SERVER
+-------------------------- */
 
 const PORT = process.env.PORT || 3000;
 
