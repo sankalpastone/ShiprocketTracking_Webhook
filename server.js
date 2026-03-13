@@ -75,7 +75,10 @@ app.post("/sankalpa-webhook", async (req, res) => {
       order_id,
       awb,
       courier,
+
+      shipment_status: status,   // add this
       status,
+
       location,
       tracking_link,
       status_type: statusType,
