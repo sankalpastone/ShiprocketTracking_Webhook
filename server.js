@@ -57,7 +57,7 @@ app.post("/sankalpa-webhook", async (req, res) => {
 
     await axios.post(ZOLILO_WEBHOOK, {
 
-      phone: "CUSTOMER_PHONE_NUMBER",
+      phone: "919508372431",
       name: "Customer",
 
       order_id: order_id,
