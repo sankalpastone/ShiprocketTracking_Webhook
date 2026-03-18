@@ -4,10 +4,10 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-const SECRET = "sankalpa_shiprocket_secret";
+const SECRET = "sankalpa_secret";
 const ZOLILO_WEBHOOK = "https://automation.zolilo.com/webhook/69ba716802e28c7ee4ef6a41";
 
-app.post("/shiprocket-webhook", async (req, res) => {
+app.post("/sankalpa-webhook", async (req, res) => {
   try {
 
     const apiKey = req.headers["x-api-key"];
