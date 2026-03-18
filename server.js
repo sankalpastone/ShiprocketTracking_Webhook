@@ -82,6 +82,8 @@ app.post("/sankalpa-webhook", async (req, res) => {
       return res.send("Ignored");
     }
 
+    console.log("📤 Sending to com.bot:", payload);
+
     // 🚀 Send to com.bot
     await axios.post(ZOLILO_WEBHOOK, payload);
 
