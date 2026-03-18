@@ -4,10 +4,10 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-const SECRET = "sankalpa_shiprocket_secret";
+const SECRET = "sankalpa_secret";
 const ZOLILO_WEBHOOK = "https://automation.zolilo.com/webhook/69b2685702e28c7ee4e9017f";
 
-app.post("/shiprocket-webhook", async (req, res) => {
+app.post("/sankalpa-webhook", async (req, res) => {
   try {
 
     // 1️⃣ Security check
