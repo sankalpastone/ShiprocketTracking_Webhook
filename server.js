@@ -4,13 +4,12 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-const SECRET = "sankalpa_secret";
-const ZOLILO_WEBHOOK = "https://automation.zolilo.com/webhook/69b2685702e28c7ee4e9017f";
+const SECRET = "sankalpa_shiprocket_secret";
+const ZOLILO_WEBHOOK = "https://automation.zolilo.com/webhook/69ba716802e28c7ee4ef6a41";
 
-app.post("/sankalpa-webhook", async (req, res) => {
+app.post("/shiprocket-webhook", async (req, res) => {
   try {
 
-    // 1️⃣ Security check
     const apiKey = req.headers["x-api-key"];
     if (apiKey !== SECRET) {
       return res.status(403).send("Unauthorized");
@@ -22,41 +21,71 @@ app.post("/sankalpa-webhook", async (req, res) => {
       awb,
       shipment_status,
       courier_name,
-      order_id
+      order_id,
+      etd
     } = req.body;
 
-    let statusType = "";
+    // ⚠️ Replace these later with real data
+    const name = "Customer";
+    const product = "Your Product";
+    const codAmount = "Amount";
 
-    // 2️⃣ Smart status mapping
-    if (shipment_status === "OUT FOR DELIVERY") {
-      statusType = "out_for_delivery";
-    } 
-    else if (shipment_status === "DELIVERED") {
-      statusType = "delivered";
-    } 
-    else if (shipment_status === "SHIPPED" || shipment_status === "IN TRANSIT") {
-      statusType = "shipped";
-    } 
-    else {
-      return res.send("Ignored status");
+    let payload = {};
+
+    // 🚚 SHIPPED TEMPLATE
+    if (shipment_status === "SHIPPED" || shipment_status === "IN TRANSIT") {
+
+      payload = {
+        phone: "919XXXXXXXXX",
+        template_name: "order shipped",
+        variables: [
+          name,          // {{1}}
+          order_id,      // {{2}}
+          courier_name,  // {{3}}
+          awb,           // {{4}}
+          `https://shiprocket.co/tracking/${awb}`, // {{5}}
+          etd || "Soon"  // {{6}}
+        ]
+      };
     }
 
-    const trackingLink = `https://shiprocket.co/tracking/${awb}`;
+    // 📦 OUT FOR DELIVERY TEMPLATE
+    else if (shipment_status === "OUT FOR DELIVERY") {
 
-    console.log("🚚 Final Status:", statusType);
+      payload = {
+        phone: "919XXXXXXXXX",
+        template_name: "out for delivery",
+        variables: [
+          name,       // {{1}}
+          order_id,   // {{2}}
+          product,    // {{3}}
+          codAmount   // {{4}}
+        ]
+      };
+    }
 
-    // 3️⃣ Send to com.bot
-    await axios.post(ZOLILO_WEBHOOK, {
-      phone: "CUSTOMER_PHONE", // replace later
-      name: "Customer",
-      order_id,
-      awb,
-      status: statusType,
-      courier: courier_name,
-      tracking_link: trackingLink
-    });
+    // ✅ DELIVERED TEMPLATE
+    else if (shipment_status === "DELIVERED") {
 
-    console.log("✅ Sent to com.bot");
+      payload = {
+        phone: "919XXXXXXXXX",
+        template_name: "delivery confirmation",
+        variables: [
+          name,       // {{1}}
+          order_id,   // {{2}}
+          product     // {{3}}
+        ]
+      };
+    }
+
+    else {
+      return res.send("Ignored");
+    }
+
+    // 🚀 Send to com.bot
+    await axios.post(ZOLILO_WEBHOOK, payload);
+
+    console.log("✅ Template sent");
 
     res.send("Done");
 
@@ -66,9 +95,7 @@ app.post("/sankalpa-webhook", async (req, res) => {
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("Server Running 🚀");
-});
+app.listen(process.env.PORT || 3000, () =>
+  console.log("🚀 Server running")
+);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server on ${PORT}`));
