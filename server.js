@@ -9,7 +9,6 @@ const ZOLILO_WEBHOOK = "https://automation.zolilo.com/webhook/69ba716802e28c7ee4
 
 app.post("/sankalpa-webhook", async (req, res) => {
   try {
-
     const apiKey = req.headers["x-api-key"];
     if (apiKey !== SECRET) {
       return res.status(403).send("Unauthorized");
@@ -22,82 +21,88 @@ app.post("/sankalpa-webhook", async (req, res) => {
       shipment_status,
       courier_name,
       order_id,
-      etd
+      etd,
+      phone
     } = req.body;
 
-    // ⚠️ Replace these later with real data
-    const name = "Customer";
-    const product = "Your Product";
-    const codAmount = "Amount";
+    const status = shipment_status?.toUpperCase();
 
-    let payload = {};
+    let payload = null;
 
-    // 🚚 SHIPPED TEMPLATE
-    if (shipment_status === "SHIPPED" || shipment_status === "IN TRANSIT") {
-
+    if (status === "OUT FOR DELIVERY") {
       payload = {
-        phone: "919XXXXXXXXX",
-        template_name: "order shipped",
-        variables: [
-          name,          // {{1}}
-          order_id,      // {{2}}
-          courier_name,  // {{3}}
-          awb,           // {{4}}
-          `https://shiprocket.co/tracking/${awb}`, // {{5}}
-          etd || "Soon"  // {{6}}
-        ]
+        phone: phone,
+        message: `Namaste 👋
+
+Your Sankalpa Stone order is out for delivery today!
+
+Order: #${order_id}
+
+Please keep amount ready if this is a COD order.
+
+We hope it brings you peace and strength.`
       };
     }
 
-    // 📦 OUT FOR DELIVERY TEMPLATE
-    else if (shipment_status === "OUT FOR DELIVERY") {
-
+    else if (status === "DELIVERED") {
       payload = {
-        phone: "919XXXXXXXXX",
-        template_name: "out for delivery",
-        variables: [
-          name,       // {{1}}
-          order_id,   // {{2}}
-          product,    // {{3}}
-          codAmount   // {{4}}
-        ]
+        phone: phone,
+        message: `Namaste 👋
+
+Your Sankalpa Stone order has been delivered!
+
+Order: #${order_id}
+
+We hope your artifact brings clarity and strength to your daily Sankalpa.`
       };
     }
 
-    // ✅ DELIVERED TEMPLATE
-    else if (shipment_status === "DELIVERED") {
-
+    else if (status === "SHIPPED" || status === "IN TRANSIT") {
       payload = {
-        phone: "919XXXXXXXXX",
-        template_name: "delivery confirmation",
-        variables: [
-          name,       // {{1}}
-          order_id,   // {{2}}
-          product     // {{3}}
-        ]
+        phone: phone,
+        message: `Namaste 🙏
+
+Great news!
+Your Sankalpa Stone order has been shipped.
+
+Order: #${order_id}
+Courier: ${courier_name}
+Tracking: ${awb}
+
+Track here:
+https://shiprocket.co/tracking/${awb}
+
+Expected Delivery: ${etd || "Soon"}
+
+Your artifact is on its way to you.`
       };
     }
 
-    else {
+    if (!payload || !phone) {
+      console.log("❌ Missing phone or ignored status");
       return res.send("Ignored");
     }
 
     console.log("📤 Sending to com.bot:", payload);
 
-    // 🚀 Send to com.bot
-    await axios.post(ZOLILO_WEBHOOK, payload);
+    const response = await axios.post(ZOLILO_WEBHOOK, payload);
 
-    console.log("✅ Template sent");
+    console.log("📨 com.bot response:", response.data);
 
     res.send("Done");
 
   } catch (err) {
-    console.log(err.response?.data || err.message);
+    console.log("❌ ERROR:", err.response?.data || err.message);
     res.status(500).send("Error");
   }
 });
 
-app.listen(process.env.PORT || 3000, () =>
-  console.log("🚀 Server running")
-);
+app.get("/", (req, res) => {
+  res.send("Server Running 🚀");
+});
 
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
